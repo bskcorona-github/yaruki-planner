@@ -1,6 +1,10 @@
+'use client'
+
 import { useState } from 'react';
 import { useTaskStore } from '../lib/store';
 import { LightBulbIcon } from '@heroicons/react/24/outline';
+import { PlusIcon } from '@heroicons/react/24/outline';
+import { generateTask } from '../lib/openai';
 
 interface TaskDetails {
   title: string;
@@ -23,54 +27,31 @@ export default function TaskInput() {
   const [currentAnswer, setCurrentAnswer] = useState('');
   const [taskDetails, setTaskDetails] = useState<TaskDetails | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [goal, setGoal] = useState('');
   
   const addTask = useTaskStore((state) => state.addTask);
   const subdivideTask = useTaskStore((state) => state.subdivideTask);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!taskText.trim()) return;
+    if (!taskText.trim()) {
+      setError('タスクを入力してください');
+      return;
+    }
 
     setIsLoading(true);
     setError(null);
     setSuccessMessage(null);
     
     try {
-      // APIを呼び出してタスク詳細を分析
-      const taskAnalysisResponse = await fetch('/api/task-analyzer', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ taskText }),
-      });
-      
-      if (!taskAnalysisResponse.ok) {
-        const errorData = await taskAnalysisResponse.json();
-        throw new Error(errorData.error || 'タスク分析に失敗しました');
-      }
-      
-      const details = await taskAnalysisResponse.json() as TaskDetails;
-      setTaskDetails(details);
-      
-      // 追加情報が必要かどうかチェック
-      if (details.needsMoreInfo && details.questions && details.questions.length > 0) {
-        // 質問モードに移行
-        setQuestions(details.questions);
-        setIsQuestioning(true);
-        setCurrentQuestionIndex(0);
-        setAnswers({});
-        setCurrentAnswer('');
-        setIsLoading(false);
-        return;
-      }
-      
-      // 追加情報が不要な場合は直接タスク作成へ
-      await createTaskWithDetails(details, {});
-      
+      const task = await generateTask(taskText, goal);
+      addTask(task);
+      setTaskText('');
+      setGoal('');
     } catch (error) {
-      console.error('タスク作成エラー:', error);
-      setError(error instanceof Error ? error.message : '予期せぬエラーが発生しました');
+      console.error('Task generation error:', error);
+      setError('タスク生成中にエラーが発生しました。もう一度お試しください。');
+    } finally {
       setIsLoading(false);
     }
   };
@@ -216,59 +197,75 @@ export default function TaskInput() {
 
   // 通常の入力フォームUI
   return (
-    <div className="bg-white shadow-sm rounded-lg p-6 mb-8">
-      <h2 className="text-lg font-semibold text-gray-900 mb-4">新しい学習目標</h2>
-      
-      {successMessage && (
-        <div className="bg-green-50 text-green-800 p-3 rounded-md mb-4">
-          {successMessage}
-        </div>
-      )}
-      
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label htmlFor="task-input" className="block text-sm font-medium text-gray-700 mb-1">
-            何を学びたいですか？具体的に入力してください
+    <div className="bg-white shadow-sm rounded-lg p-4 mb-6">
+      <form onSubmit={handleSubmit}>
+        <div className="mb-4">
+          <label 
+            htmlFor="taskContent" 
+            className="block text-sm font-medium text-gray-900 mb-1"
+          >
+            新しいタスク
           </label>
           <textarea
-            id="task-input"
-            rows={3}
+            id="taskContent"
+            rows={2}
             className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border text-black"
-            placeholder="例: 5月末までに英検2級を取得したい。1日2時間程度勉強できる。リスニングが特に苦手。"
+            placeholder="何をしたいですか？例：JavaScriptの基本を学ぶ"
             value={taskText}
             onChange={(e) => setTaskText(e.target.value)}
             disabled={isLoading}
           />
-          <p className="mt-1 text-sm text-gray-500">
-            目標・期限・学習可能時間・現在のレベルなど、できるだけ詳しく入力するとより良い学習プランが作成されます
+        </div>
+        
+        <div className="mb-4">
+          <label 
+            htmlFor="taskGoal" 
+            className="block text-sm font-medium text-gray-900 mb-1"
+          >
+            目標（任意）
+          </label>
+          <input
+            type="text"
+            id="taskGoal"
+            className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border text-black"
+            placeholder="例：フロントエンドエンジニアになる"
+            value={goal}
+            onChange={(e) => setGoal(e.target.value)}
+            disabled={isLoading}
+          />
+          <p className="mt-1 text-sm text-gray-900">
+            目標を設定するとAIがより適切なタスクを提案します
           </p>
-          {error && (
-            <p className="mt-2 text-sm text-red-600">
-              エラー: {error}
-            </p>
-          )}
         </div>
-        
-        <div className="bg-gray-50 p-3 rounded-md text-sm">
-          <p className="font-medium text-gray-900 mb-2">入力例:</p>
-          <ul className="list-disc pl-5 space-y-1 text-gray-700">
-            <li>「6月末までにTOEICで800点を取りたい。現在のスコアは650点。平日は1日1時間、週末は3時間勉強できる。」</li>
-            <li>「3ヶ月でJavaプログラミングの基礎を学びたい。プログラミング経験はなし。週に10時間程度学習可能。」</li>
-            <li>「年内に簿記2級に合格したい。簿記3級は取得済み。週に3回、各2時間程度学習できる。」</li>
-          </ul>
+
+        {successMessage && (
+          <div className="bg-green-50 text-green-800 p-3 rounded-md mb-4">
+            {successMessage}
+          </div>
+        )}
+
+        {error && (
+          <div className="text-red-600 text-sm mb-4">
+            {error}
+          </div>
+        )}
+
+        <div className="flex justify-end">
+          <button
+            type="submit"
+            disabled={isLoading}
+            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
+          >
+            {isLoading ? (
+              <span>生成中...</span>
+            ) : (
+              <>
+                <PlusIcon className="-ml-1 mr-2 h-5 w-5" aria-hidden="true" />
+                <span>タスクを追加</span>
+              </>
+            )}
+          </button>
         </div>
-        
-        <button
-          type="submit"
-          className={`inline-flex justify-center rounded-md border border-transparent px-4 py-2 text-sm font-medium text-white shadow-sm ${
-            isLoading
-              ? 'bg-indigo-400 cursor-not-allowed'
-              : 'bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2'
-          }`}
-          disabled={isLoading}
-        >
-          {isLoading ? '学習プラン作成中...' : '学習プラン作成'}
-        </button>
       </form>
     </div>
   );

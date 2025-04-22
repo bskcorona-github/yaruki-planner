@@ -1,17 +1,24 @@
+'use client';
+
 import { Disclosure } from '@headlessui/react';
 import { Bars3Icon, BellIcon, XMarkIcon } from '@heroicons/react/24/outline';
-
-const navigation = [
-  { name: 'ダッシュボード', href: '/', current: true },
-  { name: 'タスク一覧', href: '/tasks', current: false },
-  { name: '分析', href: '/analytics', current: false },
-];
+import { usePathname } from 'next/navigation';
+import Link from 'next/link';
 
 function classNames(...classes: string[]) {
   return classes.filter(Boolean).join(' ');
 }
 
 export default function Header() {
+  const pathname = usePathname();
+  
+  const navigation = [
+    { name: 'ダッシュボード', href: '/', current: pathname === '/' },
+    { name: 'タスク一覧', href: '/tasks', current: pathname === '/tasks' },
+    { name: '学習ロードマップ', href: '/roadmap', current: pathname === '/roadmap' },
+    { name: '分析', href: '/analytics', current: pathname === '/analytics' },
+  ];
+  
   return (
     <Disclosure as="nav" className="bg-indigo-600">
       {({ open }) => (
@@ -35,7 +42,7 @@ export default function Header() {
                 <div className="hidden sm:ml-6 sm:block">
                   <div className="flex space-x-4">
                     {navigation.map((item) => (
-                      <a
+                      <Link
                         key={item.name}
                         href={item.href}
                         className={classNames(
@@ -47,7 +54,7 @@ export default function Header() {
                         aria-current={item.current ? 'page' : undefined}
                       >
                         {item.name}
-                      </a>
+                      </Link>
                     ))}
                   </div>
                 </div>

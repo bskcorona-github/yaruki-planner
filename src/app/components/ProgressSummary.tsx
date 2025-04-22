@@ -47,7 +47,7 @@ export default function ProgressSummary() {
       </div>
       
       {totalTasks > 0 ? (
-        <div className="mt-4 text-sm text-center text-gray-600">
+        <div className="mt-4 text-sm text-center text-gray-900">
           {
             completionRate >= 80 ? "素晴らしい進捗です！あと少しで完了です！" :
             completionRate >= 50 ? "良い進捗です！引き続き頑張りましょう。" :
@@ -56,7 +56,7 @@ export default function ProgressSummary() {
           }
         </div>
       ) : (
-        <div className="mt-4 text-sm text-center text-gray-600">
+        <div className="mt-4 text-sm text-center text-gray-900">
           タスクを追加して目標達成へ向けて進みましょう！
         </div>
       )}

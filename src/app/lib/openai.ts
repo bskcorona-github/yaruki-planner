@@ -1,15 +1,33 @@
 import OpenAI from 'openai';
-import { Task } from '../types';
+import { Task, Roadmap, RoadmapNode, MicroTask, LearningLevel } from '../types';
+import crypto from 'crypto';
+
+// OpenAIのAPIキーを取得
+const apiKey = process.env.OPENAI_API_KEY;
+
+// APIキーが設定されているか確認
+if (!apiKey) {
+  console.error('警告: OPENAI_API_KEYが設定されていません。.envまたは.env.localファイルに設定してください。');
+}
 
 // OpenAIのインスタンスを作成
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
+  apiKey: apiKey || 'dummy-key-for-development',
   timeout: 180000, // 3分のタイムアウト設定
 });
+
+// APIが有効かチェックする関数
+export const isApiAvailable = (): boolean => {
+  return !!apiKey;
+};
 
 // タスクテキストから詳細情報を抽出する関数
 export async function extractTaskDetails(taskText: string) {
   try {
+    if (!isApiAvailable()) {
+      throw new Error('OpenAI APIキーが設定されていません');
+    }
+    
     const response = await openai.chat.completions.create({
       model: 'gpt-4o',
       messages: [
@@ -87,6 +105,10 @@ export async function extractTaskDetails(taskText: string) {
 // 学習マスタープランを生成する関数
 export async function generateLearningMasterPlan(taskTitle: string, taskDescription: string, dueDate: Date | null, additionalInfo: Record<string, string> = {}) {
   try {
+    if (!isApiAvailable()) {
+      throw new Error('OpenAI APIキーが設定されていません');
+    }
+    
     console.log('マスタープラン生成開始: ', taskTitle);
     
     const systemPrompt = `あなたは教育専門家で、効率的な学習計画の立案が得意です。
@@ -930,4 +952,502 @@ function createDefaultSubtasks(title: string): Array<{
       estimatedTime: 30
     }
   ];
+}
+
+// ロードマップ生成の関数
+export async function generateRoadmap(
+  goal: string,
+  timeframe: string = '3ヶ月',
+  userLevel: LearningLevel = 'beginner',
+  userPreference?: string
+): Promise<Roadmap> {
+  try {
+    if (!isApiAvailable()) {
+      throw new Error('OpenAI APIキーが設定されていません');
+    }
+    
+    console.log('ロードマップ生成開始:', goal);
+    
+    // GPTへのプロンプト
+    const prompt = `
+      あなたは学習ロードマップ作成の専門家です。
+      以下の学習目標に対して、詳細なロードマップを作成してください。
+
+      学習目標: ${goal}
+      時間枠: ${timeframe || '特に指定なし'}
+      現在のレベル: ${userLevel || '未指定'}
+      ${userPreference ? `ユーザー設定: ${userPreference}` : ''}
+      
+      この目標を達成するための詳細なロードマップを作成してください。実践的で具体的な学習パスを示し、
+      以下の情報を含めてください：
+
+      1. ロードマップ全体のタイトル
+      2. 詳細な説明
+      3. 予想される総学習時間（時間単位）
+      4. 学習ノードのリスト（階層構造、各ノードには以下を含む）：
+        - タイトル
+        - 説明
+        - 重要度（'essential'、'recommended'、'optional'のいずれか）
+        - 予想される学習時間（時間単位）
+        - 子ノード（階層構造を形成）
+      5. 主要なマイルストーン（重要な達成ポイント）
+
+      レスポンスは以下のJSON形式で返してください：
+      {
+        "title": "ロードマップのタイトル",
+        "description": "詳細な説明",
+        "estimatedTotalHours": 数値,
+        "nodes": [
+          {
+            "title": "ノード1タイトル",
+            "description": "ノード1の説明",
+            "importance": "essential/recommended/optional",
+            "estimatedHours": 数値,
+            "children": [
+              // 子ノード（同じ構造）
+            ]
+          },
+          // 他のルートノード
+        ],
+        "milestones": [
+          {
+            "title": "マイルストーン1",
+            "description": "説明",
+            "nodeIds": [] // 関連するノードのID（自動生成されるため空配列を返す）
+          }
+        ]
+      }
+      `;
+    
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o',
+      messages: [
+        {
+          role: 'system',
+          content: prompt
+        },
+        {
+          role: 'user',
+          content: `目標: ${goal}
+          時間枠: ${timeframe || '特に指定なし'}
+          現在のレベル: ${userLevel || '未指定'}
+          ${userPreference ? `ユーザー設定: ${userPreference}` : ''}
+          
+          この目標を達成するための詳細なロードマップを作成してください。実践的で具体的な学習パスを示し、
+          以下の情報を含めてください：
+
+          1. ロードマップ全体のタイトル
+          2. 詳細な説明
+          3. 予想される総学習時間（時間単位）
+          4. 学習ノードのリスト（階層構造、各ノードには以下を含む）：
+            - タイトル
+            - 説明
+            - 重要度（'essential'、'recommended'、'optional'のいずれか）
+            - 予想される学習時間（時間単位）
+            - 子ノード（階層構造を形成）
+          5. 主要なマイルストーン（重要な達成ポイント）
+
+          レスポンスは以下のJSON形式で返してください：
+          {
+            "title": "ロードマップのタイトル",
+            "description": "詳細な説明",
+            "estimatedTotalHours": 数値,
+            "nodes": [
+              {
+                "title": "ノード1タイトル",
+                "description": "ノード1の説明",
+                "importance": "essential/recommended/optional",
+                "estimatedHours": 数値,
+                "children": [
+                  // 子ノード（同じ構造）
+                ]
+              },
+              // 他のルートノード
+            ],
+            "milestones": [
+              {
+                "title": "マイルストーン1",
+                "description": "説明",
+                "nodeIds": [] // 関連するノードのID（自動生成されるため空配列を返す）
+              }
+            ]
+          }`
+        }
+      ],
+      temperature: 0.4,
+      response_format: { type: 'json_object' }
+    });
+
+    console.log('ロードマップ応答受信');
+    const responseContent = response.choices[0].message.content;
+    
+    if (!responseContent) {
+      console.error('APIからの応答が空です');
+      return createDefaultRoadmap(goal);
+    }
+
+    try {
+      const roadmapData = JSON.parse(responseContent.trim());
+      
+      // IDを付与する（存在しない場合）
+      const assignIds = (nodes: RoadmapNode[], parentId?: string) => {
+        for (const node of nodes) {
+          if (!node.id) {
+            node.id = crypto.randomUUID();
+          }
+          node.parentId = parentId;
+          
+          if (Array.isArray(node.children) && node.children.length > 0) {
+            assignIds(node.children, node.id);
+          }
+        }
+      };
+      
+      if (Array.isArray(roadmapData.nodes)) {
+        assignIds(roadmapData.nodes);
+      }
+      
+      // 現在時刻を設定
+      const now = new Date();
+      
+      // ロードマップオブジェクトを生成
+      const roadmap: Roadmap = {
+        id: crypto.randomUUID(),
+        title: roadmapData.title || `${goal}のロードマップ`,
+        description: roadmapData.description || '学習目標達成のためのロードマップ',
+        goalDescription: roadmapData.goalDescription || goal,
+        category: roadmapData.category || 'learning',
+        level: roadmapData.level as LearningLevel,
+        estimatedTotalHours: roadmapData.estimatedTotalHours || 100,
+        nodes: roadmapData.nodes || [],
+        milestones: roadmapData.milestones || [],
+        createdAt: now,
+        updatedAt: now,
+        version: 1
+      };
+      
+      console.log(`ロードマップ生成完了: ${roadmap.nodes.length}ノード`);
+      return roadmap;
+    } catch (error) {
+      console.error('JSON解析エラー:', error);
+      return createDefaultRoadmap(goal);
+    }
+  } catch (error) {
+    console.error('ロードマップ生成エラー:', error);
+    return createDefaultRoadmap(goal);
+  }
+}
+
+// デフォルトのロードマップを作成する関数
+function createDefaultRoadmap(goal: string): Roadmap {
+  const now = new Date();
+  const defaultLevel: LearningLevel = 'beginner';
+  const defaultCategory = 'learning';
+  
+  return {
+    id: crypto.randomUUID(),
+    title: `${goal}のロードマップ`,
+    description: '学習目標達成のためのロードマップ',
+    goalDescription: goal,
+    category: defaultCategory,
+    level: defaultLevel,
+    estimatedTotalHours: 20,
+    nodes: [
+      {
+        id: crypto.randomUUID(),
+        title: "基礎を学ぶ",
+        description: `${goal}の基礎を学びます。`,
+        level: defaultLevel,
+        category: defaultCategory,
+        importance: "essential",
+        estimatedHours: 5,
+        children: []
+      },
+      {
+        id: crypto.randomUUID(),
+        title: "応用を学ぶ",
+        description: `${goal}の応用を学びます。`,
+        level: defaultLevel,
+        category: defaultCategory,
+        importance: "essential",
+        estimatedHours: 10,
+        children: []
+      },
+      {
+        id: crypto.randomUUID(),
+        title: "実践する",
+        description: `${goal}を実践します。`,
+        level: defaultLevel,
+        category: defaultCategory,
+        importance: "essential",
+        estimatedHours: 5,
+        children: []
+      }
+    ],
+    milestones: [
+      {
+        title: "基礎の習得",
+        description: "基礎を習得しました。",
+        nodeIds: []
+      }
+    ],
+    createdAt: now,
+    updatedAt: now,
+    version: 1
+  };
+}
+
+// 小タスク生成の関数
+export async function generateMicroTasks(node: RoadmapNode, count: number = 5): Promise<MicroTask[]> {
+  try {
+    if (!isApiAvailable()) {
+      throw new Error('OpenAI APIキーが設定されていません');
+    }
+    
+    console.log('小タスク生成開始:', node.title);
+    
+    const systemPrompt = `あなたは学習コンテンツと課題作成の専門家です。
+    与えられたロードマップのノード（学習トピック）に基づいて、具体的で実践的な小タスクを作成してください。
+    
+    小タスクとは、ユーザーが実際に手を動かして取り組める具体的な学習活動や課題のことです。
+    読むだけ、見るだけではなく、実際にコードを書いたり、問題を解いたり、プロジェクトを作成したりするアクティブラーニングを促進するものであるべきです。
+    
+    以下の要素を含む小タスクのリストをJSON配列形式で作成してください：
+    
+    - id: タスクの一意識別子（空文字でOK、システムで自動生成します）
+    - title: タスク名（簡潔で明確に）
+    - description: タスクの簡単な概要（1-2文）
+    - type: タスクの種類（"reading", "exercise", "project", "quiz", "practice"のいずれか）
+    - difficulty: 難易度（"easy", "medium", "hard"のいずれか）
+    - estimatedMinutes: 完了までの予想時間（分単位）
+    - instructions: タスクの詳細な手順（十分に具体的であること）
+    - resources: 関連するリソース（URL、書籍名など）
+    - codeSnippet: コードスニペット（該当する場合）
+    - expectedOutput: 期待される結果（該当する場合）
+    - hints: ヒント（つまずいた場合のためのヒント）
+    
+    以下のガイドラインに従って小タスクを作成してください：
+    
+    - タスクは具体的で実用的であること
+    - タスクは実際に手を動かすことを重視すること
+    - 理論だけでなく実践を含めること
+    - タスクは与えられたノードのトピックに直接関連していること
+    - 難易度はユーザーのレベルに合わせること
+    - タスクは明確な目標と達成条件を持つこと
+    
+    ${count}個の小タスクを含むJSON配列のみを返してください。`;
+
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o',
+      messages: [
+        {
+          role: 'system',
+          content: systemPrompt
+        },
+        {
+          role: 'user',
+          content: `以下のロードマップノード（学習トピック）に基づいて、具体的な小タスクを${count}個作成してください：
+          
+          トピック: ${node.title}
+          説明: ${node.description}
+          レベル: ${node.level}
+          カテゴリ: ${node.category}
+          重要度: ${node.importance}
+          推定学習時間: ${node.estimatedHours}時間
+          
+          このトピックに関連する具体的で実践的な小タスクを作成してください。
+          ユーザーが実際に手を動かして取り組める内容で、学習効果が高いものにしてください。`
+        }
+      ],
+      temperature: 0.7,
+      response_format: { type: 'json_object' }
+    });
+
+    console.log('小タスク応答受信');
+    const responseContent = response.choices[0].message.content;
+    
+    if (!responseContent) {
+      console.error('APIからの応答が空です');
+      return createDefaultMicroTasks(node);
+    }
+
+    try {
+      // JSON応答をパース
+      const tasksData = JSON.parse(responseContent.trim());
+      const tasks = Array.isArray(tasksData) ? tasksData : tasksData.tasks || [];
+      
+      if (!Array.isArray(tasks) || tasks.length === 0) {
+        console.error('小タスク生成結果が空または配列ではありません');
+        return createDefaultMicroTasks(node);
+      }
+      
+      // 現在時刻
+      const now = new Date();
+      
+      // 小タスクの配列を生成
+      const microTasks: MicroTask[] = tasks.map((task: {
+        title?: string;
+        description?: string;
+        type?: string;
+        difficulty?: string;
+        estimatedMinutes?: number;
+        instructions?: string;
+        resources?: string[];
+        codeSnippet?: string;
+        expectedOutput?: string;
+        hints?: string[];
+      }) => ({
+        id: crypto.randomUUID(),
+        roadmapNodeId: node.id,
+        title: task.title || `${node.title}に関するタスク`,
+        description: task.description || '詳細情報はありません',
+        type: task.type && ['reading', 'exercise', 'project', 'quiz', 'practice'].includes(task.type) 
+          ? task.type as 'reading' | 'exercise' | 'project' | 'quiz' | 'practice' : 'practice',
+        difficulty: task.difficulty && ['easy', 'medium', 'hard'].includes(task.difficulty)
+          ? task.difficulty as 'easy' | 'medium' | 'hard' : 'medium',
+        estimatedMinutes: task.estimatedMinutes && !isNaN(Number(task.estimatedMinutes))
+          ? Number(task.estimatedMinutes) : 30,
+        instructions: task.instructions || '詳細な手順はありません',
+        resources: Array.isArray(task.resources) ? task.resources : [],
+        codeSnippet: task.codeSnippet || undefined,
+        expectedOutput: task.expectedOutput || undefined,
+        hints: Array.isArray(task.hints) ? task.hints : [],
+        status: 'pending',
+        createdAt: now,
+        updatedAt: now
+      }));
+      
+      console.log(`小タスク生成完了: ${microTasks.length}タスク`);
+      return microTasks;
+    } catch (error) {
+      console.error('JSON解析エラー:', error);
+      return createDefaultMicroTasks(node);
+    }
+  } catch (error) {
+    console.error('小タスク生成エラー:', error);
+    return createDefaultMicroTasks(node);
+  }
+}
+
+// デフォルトの小タスクを作成する関数
+function createDefaultMicroTasks(node: RoadmapNode): MicroTask[] {
+  const now = new Date();
+  
+  return [
+    {
+      id: crypto.randomUUID(),
+      roadmapNodeId: node.id,
+      title: `${node.title}の基本概念を学ぶ`,
+      description: `${node.title}に関する基本的な概念と用語を学習する`,
+      type: 'reading',
+      difficulty: 'easy',
+      estimatedMinutes: 30,
+      instructions: `1. ${node.title}に関する基本的な用語や概念を調べる\n2. 重要なポイントをノートにまとめる\n3. 理解度をチェックするための質問に答える`,
+      resources: ['推奨される入門書籍やオンラインリソース'],
+      status: 'pending',
+      createdAt: now,
+      updatedAt: now
+    },
+    {
+      id: crypto.randomUUID(),
+      roadmapNodeId: node.id,
+      title: `${node.title}の演習問題に取り組む`,
+      description: `${node.title}についての理解を深めるための演習問題`,
+      type: 'exercise',
+      difficulty: 'medium',
+      estimatedMinutes: 45,
+      instructions: `1. 提供された演習問題を解く\n2. 解答を確認し、間違いを理解する\n3. 難しかった問題を再度解いてみる`,
+      status: 'pending',
+      createdAt: now,
+      updatedAt: now
+    },
+    {
+      id: crypto.randomUUID(),
+      roadmapNodeId: node.id,
+      title: `${node.title}の小プロジェクトを作成`,
+      description: `${node.title}の知識を活用した小規模なプロジェクト`,
+      type: 'project',
+      difficulty: 'medium',
+      estimatedMinutes: 60,
+      instructions: `1. プロジェクトの要件を確認\n2. 必要な環境をセットアップ\n3. ステップバイステップで実装\n4. 動作テストを行う\n5. 改善点を考察する`,
+      hints: ['まずは最小限の機能から始める', '問題が発生したら分割して考える'],
+      status: 'pending',
+      createdAt: now,
+      updatedAt: now
+    },
+    {
+      id: crypto.randomUUID(),
+      roadmapNodeId: node.id,
+      title: `${node.title}の知識をテストする`,
+      description: `${node.title}についての理解度を確認するためのクイズ`,
+      type: 'quiz',
+      difficulty: 'easy',
+      estimatedMinutes: 20,
+      instructions: `1. 用意されたクイズに答える\n2. 正答を確認し、間違えた問題を復習する\n3. 理解が不十分な箇所を特定する`,
+      status: 'pending',
+      createdAt: now,
+      updatedAt: now
+    },
+    {
+      id: crypto.randomUUID(),
+      roadmapNodeId: node.id,
+      title: `${node.title}を実践的に応用する`,
+      description: `${node.title}の知識を実際の問題解決に応用する`,
+      type: 'practice',
+      difficulty: 'hard',
+      estimatedMinutes: 90,
+      instructions: `1. 実践的な問題シナリオを確認\n2. 解決策を計画\n3. 実装または解決策を実行\n4. 結果を評価し、改善点を考察`,
+      status: 'pending',
+      createdAt: now,
+      updatedAt: now
+    }
+  ];
+}
+
+// タスクを生成する関数
+export async function generateTask(
+  title: string,
+  goal: string = "",
+  description: string = "",
+  dueDate: Date | null = null,
+  priority: 'high' | 'medium' | 'low' = 'medium'
+): Promise<Task> {
+  console.log(`Generating task: ${title}`);
+  
+  try {
+    // 現在の日付から7日後をデフォルトの締め切りとする
+    const defaultDueDate = new Date();
+    defaultDueDate.setDate(defaultDueDate.getDate() + 7);
+    
+    // タスクオブジェクトを作成
+    const task: Task = {
+      id: crypto.randomUUID(),
+      title,
+      description: goal ? `${description}\n目標: ${goal}` : description,
+      dueDate: dueDate || defaultDueDate,
+      priority,
+      status: 'pending',
+      estimatedTime: 60, // デフォルトは60分
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+    
+    console.log(`Task generation completed: ${task.id}`);
+    return task;
+    
+  } catch (error) {
+    console.error('Error generating task:', error);
+    // エラーが発生した場合はシンプルなタスクを返す
+    return {
+      id: crypto.randomUUID(),
+      title: title || 'タスク',
+      description: description || 'タスクの説明',
+      dueDate: null,
+      priority: 'medium',
+      status: 'pending',
+      estimatedTime: 60,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+  }
 } 

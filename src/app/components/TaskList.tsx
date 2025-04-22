@@ -26,7 +26,7 @@ export default function TaskList() {
   };
 
   const statusColorMap = {
-    'pending': 'text-gray-600 bg-gray-50',
+    'pending': 'text-gray-900 bg-gray-50',
     'in-progress': 'text-blue-600 bg-blue-50',
     'completed': 'text-green-600 bg-green-50 line-through',
   };
@@ -39,7 +39,7 @@ export default function TaskList() {
     return (
       <div className="text-center py-12">
         <h3 className="mt-2 text-lg font-medium text-gray-900">タスクがありません</h3>
-        <p className="mt-1 text-sm text-gray-500">
+        <p className="mt-1 text-sm text-gray-900">
           新しいタスクを追加して、目標達成に近づきましょう。
         </p>
       </div>
@@ -54,7 +54,7 @@ export default function TaskList() {
     return (
       <div className="text-center py-12">
         <h3 className="mt-2 text-lg font-medium text-gray-900">メインタスクがありません</h3>
-        <p className="mt-1 text-sm text-gray-500">
+        <p className="mt-1 text-sm text-gray-900">
           何か問題が発生しているようです。新しい目標を設定してください。
         </p>
       </div>
@@ -90,7 +90,7 @@ export default function TaskList() {
                         e.stopPropagation();
                         completeTask(task.id);
                       }}
-                      className="mr-3 text-gray-400 hover:text-green-500"
+                      className="mr-3 text-gray-600 hover:text-green-500"
                     >
                       <CheckCircleIcon className={`h-6 w-6 ${task.status === 'completed' ? 'text-green-500' : ''}`} />
                     </button>
@@ -99,7 +99,7 @@ export default function TaskList() {
                         {task.title}
                       </p>
                       {task.description && (
-                        <p className="mt-1 text-xs text-gray-500 line-clamp-1">
+                        <p className="mt-1 text-xs text-gray-900 line-clamp-1">
                           {task.description}
                         </p>
                       )}
@@ -110,7 +110,7 @@ export default function TaskList() {
                       {task.priority === 'high' ? '高' : task.priority === 'medium' ? '中' : '低'}
                     </span>
                     {task.dueDate && (
-                      <div className="flex items-center text-sm text-gray-500 mr-4">
+                      <div className="flex items-center text-sm text-gray-900 mr-4">
                         <ClockIcon className="h-4 w-4 mr-1" />
                         {format(new Date(task.dueDate), 'yyyy/MM/dd', { locale: ja })}
                       </div>
@@ -128,7 +128,7 @@ export default function TaskList() {
                         e.stopPropagation();
                         deleteTask(task.id);
                       }}
-                      className="text-gray-400 hover:text-red-500"
+                      className="text-gray-600 hover:text-red-500"
                     >
                       <TrashIcon className="h-5 w-5" />
                     </button>
@@ -152,26 +152,26 @@ export default function TaskList() {
                           <div className="flex items-start">
                             <button
                               onClick={() => completeTask(childTask.id)}
-                              className="mt-0.5 mr-3 text-gray-400 hover:text-green-500"
+                              className="mt-0.5 mr-3 text-gray-600 hover:text-green-500"
                             >
                               <CheckCircleIcon className={`h-5 w-5 ${childTask.status === 'completed' ? 'text-green-500' : ''}`} />
                             </button>
                             <div>
                               <div className="flex items-center">
-                                <span className="text-xs font-semibold text-gray-500 mr-2">ステップ {index + 1}</span>
+                                <span className="text-xs font-semibold text-gray-900 mr-2">ステップ {index + 1}</span>
                                 <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${priorityColorMap[childTask.priority]}`}>
                                   {childTask.priority === 'high' ? '高優先' : childTask.priority === 'medium' ? '中優先' : '低優先'}
                                 </span>
                               </div>
-                              <p className={`text-sm font-medium mt-1 ${childTask.status === 'completed' ? 'line-through text-gray-500' : 'text-gray-900'}`}>
+                              <p className={`text-sm font-medium mt-1 ${childTask.status === 'completed' ? 'line-through text-gray-700' : 'text-gray-900'}`}>
                                 {childTask.title}
                               </p>
                               {childTask.description && (
-                                <p className="mt-1 text-xs text-gray-600">
+                                <p className="mt-1 text-xs text-gray-900">
                                   {childTask.description}
                                 </p>
                               )}
-                              <div className="mt-2 flex items-center text-xs text-gray-500">
+                              <div className="mt-2 flex items-center text-xs text-gray-900">
                                 {childTask.dueDate && (
                                   <span className="flex items-center mr-3">
                                     <ClockIcon className="h-3 w-3 mr-1" />
@@ -188,7 +188,7 @@ export default function TaskList() {
                           </div>
                           <button
                             onClick={() => deleteTask(childTask.id)}
-                            className="ml-2 text-gray-400 hover:text-red-500"
+                            className="ml-2 text-gray-600 hover:text-red-500"
                           >
                             <TrashIcon className="h-4 w-4" />
                           </button>

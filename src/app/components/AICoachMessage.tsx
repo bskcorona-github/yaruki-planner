@@ -1,3 +1,5 @@
+'use client';
+
 import { useState, useEffect } from 'react';
 import { useTaskStore } from '../lib/store';
 import { ExclamationCircleIcon } from '@heroicons/react/24/outline';
@@ -14,12 +16,12 @@ interface MotivationalMessage {
 export default function AICoachMessage() {
   const tasks = useTaskStore((state) => state.tasks);
   const [message, setMessage] = useState<MotivationalMessage>({
-    greeting: 'おはようございます！',
-    message: '今日も新しい一日の始まりです。目標達成に向けて一歩一歩進んでいきましょう。',
+    greeting: 'こんにちは、AIコーチです！',
+    message: '今日も一緒に頑張りましょう。新しいタスクを追加して、学習を始めましょう。',
     urgentMessage: '',
-    goals: ['未完了タスクの1つを完了させる', '新しい目標を設定する'],
-    tips: '大きなタスクは小さく分けると達成しやすくなります。',
-    closing: 'あなたならできます！'
+    goals: ['新しい学習目標を設定する', '学習計画を立てる'],
+    tips: '学習は継続が大切です。毎日少しずつ進めていきましょう。',
+    closing: '頑張ってください！'
   });
   const [isLoading, setIsLoading] = useState(false);
 
@@ -31,25 +33,43 @@ export default function AICoachMessage() {
   }, [tasks.length]);
 
   const generateMotivationalMessage = async () => {
+    if (isLoading) return;
+    
     setIsLoading(true);
+    
     try {
-      const response = await fetch('/api/motivation-message', {
+      // リクエストのタイムアウトを設定
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+      
+      const response = await fetch('/api/motivational-message', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ tasks }),
+        signal: controller.signal
       });
       
+      clearTimeout(timeoutId);
+      
       if (!response.ok) {
-        throw new Error('メッセージ生成に失敗しました');
+        throw new Error('メッセージの取得に失敗しました');
       }
       
-      const newMessage = await response.json();
-      setMessage(newMessage);
+      const data = await response.json();
+      setMessage(data);
     } catch (error) {
-      console.error('モチベーションメッセージ生成エラー:', error);
-      // エラー時はデフォルトメッセージを表示するだけにする
+      console.error('動機付けメッセージ生成エラー:', error);
+      // エラー時はデフォルトメッセージを表示
+      setMessage({
+        greeting: 'こんにちは！',
+        message: '今日も学習を頑張りましょう！',
+        goals: ['今日のタスクに取り組む', '新しい知識を身につける'],
+        tips: 'コツコツと継続することが大切です。無理せず着実に進めていきましょう。',
+        closing: '応援しています！',
+        urgentMessage: ''
+      });
     } finally {
       setIsLoading(false);
     }
@@ -67,7 +87,7 @@ export default function AICoachMessage() {
           {isLoading ? '更新中...' : '更新'}
         </button>
       </div>
-      <div className={`text-sm text-gray-600 ${isLoading ? 'opacity-50' : ''}`}>
+      <div className={`text-sm text-gray-900 ${isLoading ? 'opacity-50' : ''}`}>
         <p className="mb-2">{message.greeting}</p>
         <p className="mb-4">{message.message}</p>
         
